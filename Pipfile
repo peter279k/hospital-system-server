@@ -1,0 +1,14 @@
+[[source]]
+url = "https://pypi.python.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+fastapi = "*"
+uvicorn = "*"
+requests = "*"
+data_model = {path = ".", editable = true}
+hospital-system-server = {editable = true, path = "."}
+
+[dev-packages]
+pytest = "*"
