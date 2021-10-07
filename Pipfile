@@ -7,7 +7,6 @@ name = "pypi"
 fastapi = "*"
 uvicorn = "*"
 requests = "*"
-data_model = {path = ".", editable = true}
 hospital-system-server = {editable = true, path = "."}
 
 [dev-packages]

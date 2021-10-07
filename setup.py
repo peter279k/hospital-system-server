@@ -2,7 +2,7 @@
 
 from setuptools import setup
 
-setup(name='vtn-rest',
+setup(name='hospital-system-server',
       version='0.1',
       description='The VTN REST',
       url='https://gitlab.com/iii-api-platform/fhir-client',
