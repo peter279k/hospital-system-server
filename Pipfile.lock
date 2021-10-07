@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "ba8a3b2b8fec9ea6ddef44f6c9ccb84c89a8a979bc8d95b2de4a6596b3c5edad"
+            "sha256": "ea5df24a2dccd49866ef5ddf4bdb05488603d42031257708241482269cf2a293"
         },
         "pipfile-spec": 6,
         "requires": {},
@@ -44,10 +44,6 @@
             ],
             "markers": "python_version >= '3.6'",
             "version": "==8.0.1"
-        },
-        "data-model": {
-            "editable": true,
-            "path": "."
         },
         "fastapi": {
             "hashes": [
