@@ -260,6 +260,71 @@ def create_compposition_resource(composition_resource_model: CompositionResource
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
 
+# Create GET method API to query Observation Resource by id
+@app.get('/api/GetObservation/{observation_id}')
+def get_observation_resource_by_id(observation_id: str, response: Response):
+    fhir_server = get_fhir_server_setting()
+    if fhir_server is False:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
+
+    fhir_client = Client(fhir_server)
+    fhir_client_response = fhir_client.get_observation_resource_by_id(observation_id)
+    response.status_code = fhir_client_response.status_code
+    return loads(fhir_client_response.text)
+
+class ObservationResourceModel(BaseModel):
+    json_payload: str
+
+# Create POST method API to create composition resource
+@app.post('/api/CreateObservation')
+def create_observation_resource(observation_resource_model: ObservationResourceModel, response: Response):
+    post_data = observation_resource_model.dict()
+    json_payload = b64decode(post_data['json_payload']).decode('utf-8')
+    if check_json_field(post_data, 'json_payload') is False:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'json_payload is missed.'}
+    check_result = check_json_str(json_payload)
+    if check_result is not True:
+        response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+        return check_result
+
+    fhir_server = get_fhir_server_setting()
+    if fhir_server is False:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
+
+    fhir_client = Client(fhir_server)
+    fhir_client_response = fhir_client.upload_observation_resource(json_payload.encode('utf-8'))
+    response.status_code = fhir_client_response.status_code
+    return loads(fhir_client_response.text)
+
+class BundleResourceModel(BaseModel):
+    json_payload: str
+
+# Create POST method API to create immunization or observation bundle resource
+@app.post('/api/CreateBundle/{bundle_name}')
+def create_bundle_resource(bundle_name, bundle_resource_model: BundleResourceModel, response: Response):
+    post_data = bundle_resource_model.dict()
+    json_payload = b64decode(post_data['json_payload']).decode('utf-8')
+    if check_json_field(post_data, 'json_payload') is False:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'json_payload is missed.'}
+    check_result = check_json_str(json_payload)
+    if check_result is not True:
+        response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+        return check_result
+
+    fhir_server = get_fhir_server_setting()
+    if fhir_server is False:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
+
+    fhir_client = Client(fhir_server)
+    fhir_client_response = fhir_client.upload_bundle_resource(json_payload.encode('utf-8'), bundle_name)
+    response.status_code = fhir_client_response.status_code
+    return loads(fhir_client_response.text)
+
 def check_fhir_server_status(fhir_server):
     try:
         requests.get(fhir_server)

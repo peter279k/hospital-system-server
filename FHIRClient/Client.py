@@ -106,7 +106,33 @@ class Client:
 
         return response
 
+    def upload_observation_resource(self, json_payload):
+        self.headers['Accept'] = self.accept_header
+        self.headers['Content-Type'] = self.content_type_header
+        fhir_server = self.fhir_server + '/Observation'
+        response = requests.post(fhir_server, headers=self.headers, data=json_payload)
+        self.status_code_handler(response, 'upload_observation_resource')
+
+        return response
+
+    def get_observation_resource_by_id(self, observation_id):
+        self.headers['Accept'] = self.accept_header
+        fhir_server = self.fhir_server + '/Observation/' + observation_id
+        response = requests.get(fhir_server, headers=self.headers)
+        self.status_code_handler(response, 'get_observation_resource_by_id')
+
+        return response
+
+    def upload_bundle_resource(self, json_payload, bundle_name):
+        self.headers['Accept'] = self.accept_header
+        self.headers['Content-Type'] = self.content_type_header
+        fhir_server = self.fhir_server + '/Bundle'
+        response = requests.post(fhir_server, headers=self.headers, data=json_payload)
+        self.status_code_handler(response, 'upload_bundle_resource(%s)' % bundle_name)
+
+        return response
+
     def status_code_handler(self, response, method_name):
-        if response.status_code != 200:
+        if response.status_code != 200 and response.status_code != 201:
             print('Error response when doing ' + method_name + ': ')
             print(response.text)
