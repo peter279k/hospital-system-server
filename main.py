@@ -1,6 +1,9 @@
 # Calling the FastAPI library
 from fastapi import FastAPI, Response, status
 
+# Add CORS middleware module
+from fastapi.middleware.cors import CORSMiddleware
+
 # Import BaseModel module
 from pydantic import BaseModel
 
@@ -22,8 +25,15 @@ from json import loads
 # Import base64 decode module
 from base64 import b64decode
 
+
 # Declaring as the main app to use FastAPI
 app = FastAPI()
+
+origins = [
+    'http://localhost:3000',
+]
+
+app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=['*'], allow_headers=['*'])
 
 # Create GET method API at the Root URL when going to the localhost
 @app.get('/')
@@ -87,9 +97,12 @@ class PatientResourceModel(BaseModel):
     json_payload: str
     patient_id: str
 
+class CreatePatientResourceModel(BaseModel):
+    json_payload: str
+
 # Create POST method API to create new Patient Resource
 @app.post('/api/CreatePatient')
-def create_patient_resource(patient_resource_model: PatientResourceModel, response: Response):
+def create_patient_resource(patient_resource_model: CreatePatientResourceModel, response: Response):
     post_data = patient_resource_model.dict()
     json_payload = b64decode(post_data['json_payload']).decode('utf-8')
     check_result = check_json_str(json_payload)
