@@ -338,6 +338,26 @@ def create_bundle_resource(bundle_name, bundle_resource_model: BundleResourceMod
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
 
+# Create GET method API to read hospital list CSV file and get hospital list JSON
+@app.get('/api/GetHospitalLists')
+def get_hospital_lists():
+    file_handler = open('./hospital.csv', 'r')
+    line_of_contents = file_handler.readline()
+    line_of_contents = file_handler.readline()
+    response_json = {
+        'hospital_name': [],
+        'hospital_number': [],
+    }
+    while line_of_contents != '':
+        line_of_contents = line_of_contents[0:-1].split(',')
+        response_json['hospital_number'].append(line_of_contents[0])
+        response_json['hospital_name'].append(line_of_contents[1])
+        line_of_contents = file_handler.readline()
+
+    file_handler.close()
+
+    return response_json
+
 def check_fhir_server_status(fhir_server):
     try:
         requests.get(fhir_server)
