@@ -59,6 +59,16 @@ def fhir_server_setup(fhir_model: FHIRModel, response: Response):
 
     return {'result': 'fhir_server setting is done!', 'fhir_server': fhir_data['fhir_server']}
 
+# Create GET method API to get targeted FHIR server URL
+@app.get('/api/fhir_server')
+def fhir_server_setup(response: Response):
+    fhir_server = get_fhir_server_setting()
+    if fhir_server is False:
+        response.status_code = status.HTTP_410_GONE
+        return {'error': 'FHIR Server URL is not found or defined. Please use POST /api/fhir_server API firstly.'}
+
+    return {'result': 'Get fhir_server setting is done!', 'fhir_server': fhir_server}
+
 # Create GET method API and query specific FHIR Resources by id
 @app.get('/api/QueryPatient/{patient_id}')
 def query_patient_resource_by_id(patient_id: str, response: Response):
