@@ -245,15 +245,28 @@ def create_immunization_resource(immunization_resource_model: ImmunizationResour
     return loads(fhir_client_response.text)
 
 # Create GET method API to query Immunization Resource by id
-@app.get('/api/GetImmunization/{immunization_id}')
-def get_immunization_resource_by_id(immunization_id: str, response: Response):
+@app.get('/api/GetImmunizationBundle/{immunization_bundle_id}')
+def get_immunization_bundle_resource_by_id(immunization_bundle_id: str, response: Response):
     fhir_server = get_fhir_server_setting()
     if fhir_server is False:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
 
     fhir_client = Client(fhir_server)
-    fhir_client_response = fhir_client.get_immunization_resource_by_id(immunization_id)
+    fhir_client_response = fhir_client.get_immunization_bundle_resource_by_id(immunization_bundle_id)
+    response.status_code = fhir_client_response.status_code
+    return loads(fhir_client_response.text)
+
+# Create GET method API to query Composition Resource by id
+@app.get('/api/GetComposition/{composition_id}')
+def get_composition_resource_by_id(composition_id: str, response: Response):
+    fhir_server = get_fhir_server_setting()
+    if fhir_server is False:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
+
+    fhir_client = Client(fhir_server)
+    fhir_client_response = fhir_client.get_composition_resource_by_id(composition_id)
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
 

@@ -89,11 +89,19 @@ class Client:
 
         return response
 
-    def get_immunization_resource_by_id(self, immunization_id):
+    def get_immunization_bundle_resource_by_id(self, immunization_bundle_id):
         self.headers['Accept'] = self.accept_header
-        fhir_server = self.fhir_server + '/Immunization/' + immunization_id
+        fhir_server = self.fhir_server + '/Bundle/' + immunization_bundle_id
         response = requests.get(fhir_server, headers=self.headers)
-        self.status_code_handler(response, 'get_immunization_resource_by_id')
+        self.status_code_handler(response, 'get_immunization_bundle_resource_by_id')
+
+        return response
+
+    def get_composition_resource_by_id(self, composition_id):
+        self.headers['Accept'] = self.accept_header
+        fhir_server = self.fhir_server + '/Composition/' + composition_id
+        response = requests.get(fhir_server, headers=self.headers)
+        self.status_code_handler(response, 'get_composition_resource_by_id')
 
         return response
 
