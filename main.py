@@ -7,6 +7,9 @@ from fastapi.middleware.cors import CORSMiddleware
 # Import BaseModel module
 from pydantic import BaseModel
 
+# Import optional body params module
+from typing import Optional
+
 # Import requests module
 import requests
 
@@ -43,6 +46,7 @@ async def get_version():
 # FHIR Server Data Model
 class FHIRModel(BaseModel):
     fhir_server: str
+    fhir_token: Optional[str] = None
 
 # Create POST method API to set targeted FHIR server
 @app.post('/api/fhir_server')
@@ -55,19 +59,22 @@ def fhir_server_setup(fhir_model: FHIRModel, response: Response):
     if check_fhir_server_status(fhir_data['fhir_server']) is False:
         return {'error': 'fhir_server field value is invalid.'}
 
-    store_fhir_server_setting(fhir_data['fhir_server'])
+    store_fhir_server_setting(fhir_data['fhir_server'], fhir_data['fhir_token'])
+
+    if fhir_data['fhir_token'] is not None:
+        return {'result': 'fhir_server setting is done!', 'fhir_server': fhir_data['fhir_server'], 'fhir_token': fhir_data['fhir_token']}
 
     return {'result': 'fhir_server setting is done!', 'fhir_server': fhir_data['fhir_server']}
 
 # Create GET method API to get targeted FHIR server URL
 @app.get('/api/fhir_server')
 def fhir_server_setup(response: Response):
-    fhir_server = get_fhir_server_setting()
-    if fhir_server is False:
+    fhir_server_info = get_fhir_server_setting()
+    if fhir_server_info is False:
         response.status_code = status.HTTP_410_GONE
         return {'error': 'FHIR Server URL is not found or defined. Please use POST /api/fhir_server API firstly.'}
 
-    return {'result': 'Get fhir_server setting is done!', 'fhir_server': fhir_server}
+    return {'result': 'Get fhir_server setting is done!', 'fhir_server': fhir_server_info[0], 'fhir_token': fhir_server_info[1]}
 
 # Create GET method API and query specific FHIR Resources by id
 @app.get('/api/QueryPatient/{patient_id}')
@@ -309,6 +316,19 @@ def create_compposition_resource(composition_resource_model: CompositionResource
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
 
+# Create GET method API to query Observation Bundle Resource by id
+@app.get('/api/GetObservationBundle/{observation_bundle_id}')
+def get_observation_bundle_resource_by_id(observation_bundle_id: str, response: Response):
+    fhir_server = get_fhir_server_setting()
+    if fhir_server is False:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
+
+    fhir_client = Client(fhir_server)
+    fhir_client_response = fhir_client.get_observation_bundle_resource_by_id(observation_bundle_id)
+    response.status_code = fhir_client_response.status_code
+    return loads(fhir_client_response.text)
+
 # Create GET method API to query Observation Resource by id
 @app.get('/api/GetObservation/{observation_id}')
 def get_observation_resource_by_id(observation_id: str, response: Response):
@@ -419,17 +439,21 @@ def create_fhir_server_table():
     db_conn.execute('''
         CREATE TABLE IF NOT EXISTS "fhir_server"(
             [ServerId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-            [Server] NVARCHAR(100) NOT NULL
+            [Server] NVARCHAR(100) NOT NULL,
+            [Token] NVARCHAR(100) NULL
         )
     ''')
     db_conn.commit()
     db_conn.close()
     return True
 
-def store_fhir_server_setting(fhir_server):
+def store_fhir_server_setting(fhir_server, fhir_token=None):
     create_fhir_server_table()
     db_conn = sqlite3.connect(gettempdir() + '/hospital_system_server.sqlite3')
-    db_conn.execute('INSERT INTO fhir_server(Server) VALUES (?)', [fhir_server])
+    if fhir_token is None:
+        db_conn.execute('INSERT INTO fhir_server(Server) VALUES (?)', [fhir_server])
+    else:
+        db_conn.execute('INSERT INTO fhir_server(Server, Token) VALUES (?, ?)', [fhir_server, fhir_token])
     db_conn.commit()
     db_conn.close()
     return True
@@ -438,10 +462,10 @@ def get_fhir_server_setting():
     create_fhir_server_table()
     db_conn = sqlite3.connect(gettempdir() + '/hospital_system_server.sqlite3')
     db_conn.cursor()
-    fetched_obj = db_conn.execute('SELECT Server FROM fhir_server ORDER BY ServerId DESC LIMIT 1')
+    fetched_obj = db_conn.execute('SELECT Server,Token FROM fhir_server ORDER BY ServerId DESC LIMIT 1')
     fetched_result = fetched_obj.fetchone()
     db_conn.close()
 
     if len(fetched_result) == 0:
         return False
-    return fetched_result[0]
+    return fetched_result

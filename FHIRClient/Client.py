@@ -3,13 +3,17 @@ import requests
 
 
 class Client:
-    def __init__(self, fhir_server=None):
+    def __init__(self, fhir_server, auth=False, fhir_token=None):
         self.fhir_server = fhir_server
         self.content_type_header = 'application/fhir+json'
         self.accept_header = 'application/fhir+json'
         self.headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.54 Safari/537.36',
         }
+        if auth is True:
+            if fhir_token is None:
+                raise ValueError('fhir_token param should not be empty!')
+            self.headers['Token'] = fhir_token
 
     def upload_patient_resource(self, json_payload):
         self.headers['Accept'] = self.accept_header
@@ -136,6 +140,14 @@ class Client:
         fhir_server = self.fhir_server + '/Observation/' + observation_id
         response = requests.get(fhir_server, headers=self.headers)
         self.status_code_handler(response, 'get_observation_resource_by_id')
+
+        return response
+
+    def get_observation_bundle_resource_by_id(self, observation_bundle_id):
+        self.headers['Accept'] = self.accept_header
+        fhir_server = self.fhir_server + '/Bundle/' + observation_bundle_id
+        response = requests.get(fhir_server, headers=self.headers)
+        self.status_code_handler(response, 'get_observation_bundle_resource_by_id')
 
         return response
 
