@@ -13,7 +13,7 @@ class Client:
         if auth is True:
             if fhir_token is None:
                 raise ValueError('fhir_token param should not be empty!')
-            self.headers['Token'] = fhir_token
+            self.headers['Authorization'] = 'Bearer ' + fhir_token
 
     def upload_patient_resource(self, json_payload):
         self.headers['Accept'] = self.accept_header
