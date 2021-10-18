@@ -79,11 +79,15 @@ def fhir_server_setup(response: Response):
 # Create GET method API and query specific FHIR Resources by id
 @app.get('/api/QueryPatient/{patient_id}')
 def query_patient_resource_by_id(patient_id: str, response: Response):
-    fhir_server = get_fhir_server_setting()
+    fhir_server_info = get_fhir_server_setting()
+    fhir_server = fhir_server_info[0]
+    fhir_token = fhir_server_info[1]
+    is_required_auth = fhir_token_existence(fhir_token)
+
     if fhir_server is False:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
-    fhir_client = Client(fhir_server)
+    fhir_client = Client(fhir_server, is_required_auth, fhir_token)
     fhir_client_response = fhir_client.get_patient_resource_by_id(patient_id)
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
@@ -100,12 +104,16 @@ def query_patient_resource_by_search_params(search_params_model: FHIRServerSearc
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {'error': 'search_params field is missed.'}
 
-    fhir_server = get_fhir_server_setting()
+    fhir_server_info = get_fhir_server_setting()
+    fhir_server = fhir_server_info[0]
+    fhir_token = fhir_server_info[1]
+    is_required_auth = fhir_token_existence(fhir_token)
+
     if fhir_server is False:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
 
-    fhir_client = Client(fhir_server)
+    fhir_client = Client(fhir_server, is_required_auth, fhir_token)
     fhir_client_response = fhir_client.get_patient_resource_by_search(post_data['search_params'])
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
@@ -127,12 +135,16 @@ def create_patient_resource(patient_resource_model: CreatePatientResourceModel, 
         response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
         return check_result
 
-    fhir_server = get_fhir_server_setting()
+    fhir_server_info = get_fhir_server_setting()
+    fhir_server = fhir_server_info[0]
+    fhir_token = fhir_server_info[1]
+    is_required_auth = fhir_token_existence(fhir_token)
+
     if fhir_server is False:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
 
-    fhir_client = Client(fhir_server)
+    fhir_client = Client(fhir_server, is_required_auth, fhir_token)
     fhir_client_response = fhir_client.upload_patient_resource(json_payload.encode('utf-8'))
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
@@ -150,12 +162,16 @@ def update_patient_resource(patient_resource_model: PatientResourceModel, respon
         response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
         return check_result
 
-    fhir_server = get_fhir_server_setting()
+    fhir_server_info = get_fhir_server_setting()
+    fhir_server = fhir_server_info[0]
+    fhir_token = fhir_server_info[1]
+    is_required_auth = fhir_token_existence(fhir_token)
+
     if fhir_server is False:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
 
-    fhir_client = Client(fhir_server)
+    fhir_client = Client(fhir_server, is_required_auth, fhir_token)
     fhir_client_response = fhir_client.update_patient_resource(json_payload.encode('utf-8'), post_data['patient_id'])
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
@@ -163,12 +179,16 @@ def update_patient_resource(patient_resource_model: PatientResourceModel, respon
 # Create DELETE method API to delete existed Patient Resource
 @app.delete('/api/DeletePatient/{patient_id}')
 def delete_patient_resource(patient_id: str, response: Response):
-    fhir_server = get_fhir_server_setting()
+    fhir_server_info = get_fhir_server_setting()
+    fhir_server = fhir_server_info[0]
+    fhir_token = fhir_server_info[1]
+    is_required_auth = fhir_token_existence(fhir_token)
+
     if fhir_server is False:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
 
-    fhir_client = Client(fhir_server)
+    fhir_client = Client(fhir_server, is_required_auth, fhir_token)
     fhir_client_response = fhir_client.delete_patient_resource_by_id(patient_id)
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
@@ -176,12 +196,16 @@ def delete_patient_resource(patient_id: str, response: Response):
 # Create GET method API to get Patient Resource lists
 @app.get('/api/PatientList')
 def get_patient_resource(response: Response):
-    fhir_server = get_fhir_server_setting()
+    fhir_server_info = get_fhir_server_setting()
+    fhir_server = fhir_server_info[0]
+    fhir_token = fhir_server_info[1]
+    is_required_auth = fhir_token_existence(fhir_token)
+
     if fhir_server is False:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
 
-    fhir_client = Client(fhir_server)
+    fhir_client = Client(fhir_server, is_required_auth, fhir_token)
     fhir_client_response = fhir_client.get_patient_lists()
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
@@ -202,12 +226,16 @@ def create_organization_resource(org_resource_model: OrganizationResourceModel, 
         response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
         return check_result
 
-    fhir_server = get_fhir_server_setting()
+    fhir_server_info = get_fhir_server_setting()
+    fhir_server = fhir_server_info[0]
+    fhir_token = fhir_server_info[1]
+    is_required_auth = fhir_token_existence(fhir_token)
+
     if fhir_server is False:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
 
-    fhir_client = Client(fhir_server)
+    fhir_client = Client(fhir_server, is_required_auth, fhir_token)
     fhir_client_response = fhir_client.upload_organization_resource(json_payload.encode('utf-8'))
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
@@ -215,12 +243,16 @@ def create_organization_resource(org_resource_model: OrganizationResourceModel, 
 # Create GET method API to query Organization Resource by id
 @app.get('/api/GetOrganization/{organization_id}')
 def get_organization_resource_by_id(organization_id: str, response: Response):
-    fhir_server = get_fhir_server_setting()
+    fhir_server_info = get_fhir_server_setting()
+    fhir_server = fhir_server_info[0]
+    fhir_token = fhir_server_info[1]
+    is_required_auth = fhir_token_existence(fhir_token)
+
     if fhir_server is False:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
 
-    fhir_client = Client(fhir_server)
+    fhir_client = Client(fhir_server, is_required_auth, fhir_token)
     fhir_client_response = fhir_client.get_organization_resource_by_id(organization_id)
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
@@ -241,12 +273,16 @@ def create_immunization_resource(immunization_resource_model: ImmunizationResour
         response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
         return check_result
 
-    fhir_server = get_fhir_server_setting()
+    fhir_server_info = get_fhir_server_setting()
+    fhir_server = fhir_server_info[0]
+    fhir_token = fhir_server_info[1]
+    is_required_auth = fhir_token_existence(fhir_token)
+
     if fhir_server is False:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
 
-    fhir_client = Client(fhir_server)
+    fhir_client = Client(fhir_server, is_required_auth, fhir_token)
     fhir_client_response = fhir_client.upload_immunization_resource(json_payload.encode('utf-8'))
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
@@ -254,12 +290,16 @@ def create_immunization_resource(immunization_resource_model: ImmunizationResour
 # Create GET method API to query Immunization Resource by id
 @app.get('/api/GetImmunization/{immunization_id}')
 def get_immunization_resource_by_id(immunization_id: str, response: Response):
-    fhir_server = get_fhir_server_setting()
+    fhir_server_info = get_fhir_server_setting()
+    fhir_server = fhir_server_info[0]
+    fhir_token = fhir_server_info[1]
+    is_required_auth = fhir_token_existence(fhir_token)
+
     if fhir_server is False:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
 
-    fhir_client = Client(fhir_server)
+    fhir_client = Client(fhir_server, is_required_auth, fhir_token)
     fhir_client_response = fhir_client.get_immunization_resource_by_id(immunization_id)
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
@@ -267,12 +307,16 @@ def get_immunization_resource_by_id(immunization_id: str, response: Response):
 # Create GET method API to query Immunization Bundle Resource by id
 @app.get('/api/GetImmunizationBundle/{immunization_bundle_id}')
 def get_immunization_bundle_resource_by_id(immunization_bundle_id: str, response: Response):
-    fhir_server = get_fhir_server_setting()
+    fhir_server_info = get_fhir_server_setting()
+    fhir_server = fhir_server_info[0]
+    fhir_token = fhir_server_info[1]
+    is_required_auth = fhir_token_existence(fhir_token)
+
     if fhir_server is False:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
 
-    fhir_client = Client(fhir_server)
+    fhir_client = Client(fhir_server, is_required_auth, fhir_token)
     fhir_client_response = fhir_client.get_immunization_bundle_resource_by_id(immunization_bundle_id)
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
@@ -280,12 +324,16 @@ def get_immunization_bundle_resource_by_id(immunization_bundle_id: str, response
 # Create GET method API to query Composition Resource by id
 @app.get('/api/GetComposition/{composition_id}')
 def get_composition_resource_by_id(composition_id: str, response: Response):
-    fhir_server = get_fhir_server_setting()
+    fhir_server_info = get_fhir_server_setting()
+    fhir_server = fhir_server_info[0]
+    fhir_token = fhir_server_info[1]
+    is_required_auth = fhir_token_existence(fhir_token)
+
     if fhir_server is False:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
 
-    fhir_client = Client(fhir_server)
+    fhir_client = Client(fhir_server, is_required_auth, fhir_token)
     fhir_client_response = fhir_client.get_composition_resource_by_id(composition_id)
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
@@ -306,12 +354,16 @@ def create_compposition_resource(composition_resource_model: CompositionResource
         response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
         return check_result
 
-    fhir_server = get_fhir_server_setting()
+    fhir_server_info = get_fhir_server_setting()
+    fhir_server = fhir_server_info[0]
+    fhir_token = fhir_server_info[1]
+    is_required_auth = fhir_token_existence(fhir_token)
+
     if fhir_server is False:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
 
-    fhir_client = Client(fhir_server)
+    fhir_client = Client(fhir_server, is_required_auth, fhir_token)
     fhir_client_response = fhir_client.upload_composition_resource(json_payload.encode('utf-8'))
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
@@ -319,12 +371,16 @@ def create_compposition_resource(composition_resource_model: CompositionResource
 # Create GET method API to query Observation Bundle Resource by id
 @app.get('/api/GetObservationBundle/{observation_bundle_id}')
 def get_observation_bundle_resource_by_id(observation_bundle_id: str, response: Response):
-    fhir_server = get_fhir_server_setting()
+    fhir_server_info = get_fhir_server_setting()
+    fhir_server = fhir_server_info[0]
+    fhir_token = fhir_server_info[1]
+    is_required_auth = fhir_token_existence(fhir_token)
+
     if fhir_server is False:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
 
-    fhir_client = Client(fhir_server)
+    fhir_client = Client(fhir_server, is_required_auth, fhir_token)
     fhir_client_response = fhir_client.get_observation_bundle_resource_by_id(observation_bundle_id)
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
@@ -332,12 +388,16 @@ def get_observation_bundle_resource_by_id(observation_bundle_id: str, response: 
 # Create GET method API to query Observation Resource by id
 @app.get('/api/GetObservation/{observation_id}')
 def get_observation_resource_by_id(observation_id: str, response: Response):
-    fhir_server = get_fhir_server_setting()
+    fhir_server_info = get_fhir_server_setting()
+    fhir_server = fhir_server_info[0]
+    fhir_token = fhir_server_info[1]
+    is_required_auth = fhir_token_existence(fhir_token)
+
     if fhir_server is False:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
 
-    fhir_client = Client(fhir_server)
+    fhir_client = Client(fhir_server, is_required_auth, fhir_token)
     fhir_client_response = fhir_client.get_observation_resource_by_id(observation_id)
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
@@ -358,12 +418,16 @@ def create_observation_resource(observation_resource_model: ObservationResourceM
         response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
         return check_result
 
-    fhir_server = get_fhir_server_setting()
+    fhir_server_info = get_fhir_server_setting()
+    fhir_server = fhir_server_info[0]
+    fhir_token = fhir_server_info[1]
+    is_required_auth = fhir_token_existence(fhir_token)
+
     if fhir_server is False:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
 
-    fhir_client = Client(fhir_server)
+    fhir_client = Client(fhir_server, is_required_auth, fhir_token)
     fhir_client_response = fhir_client.upload_observation_resource(json_payload.encode('utf-8'))
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
@@ -384,12 +448,16 @@ def create_bundle_resource(bundle_name, bundle_resource_model: BundleResourceMod
         response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
         return check_result
 
-    fhir_server = get_fhir_server_setting()
+    fhir_server_info = get_fhir_server_setting()
+    fhir_server = fhir_server_info[0]
+    fhir_token = fhir_server_info[1]
+    is_required_auth = fhir_token_existence(fhir_token)
+
     if fhir_server is False:
         response.status_code = status.HTTP_400_BAD_REQUEST
         return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
 
-    fhir_client = Client(fhir_server)
+    fhir_client = Client(fhir_server, is_required_auth, fhir_token)
     fhir_client_response = fhir_client.upload_bundle_resource(json_payload.encode('utf-8'), bundle_name)
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
@@ -469,3 +537,6 @@ def get_fhir_server_setting():
     if len(fetched_result) == 0:
         return False
     return fetched_result
+
+def fhir_token_existence(fhir_token):
+    return fhir_token is not None
