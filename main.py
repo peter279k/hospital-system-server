@@ -28,6 +28,8 @@ from json import loads
 # Import base64 decode module
 from base64 import b64decode
 
+# Import datetime module
+from datetime import datetime
 
 # Declaring as the main app to use FastAPI
 app = FastAPI()
@@ -482,6 +484,22 @@ def get_hospital_lists():
 
     return response_json
 
+# Create POST method API to generate related QRCode with specific bundle id
+@app.post('/api/GenerateQRCode')
+def generate_qrcode(bundle_resource_model: BundleResourceModel, response: Response):
+    post_data = bundle_resource_model.dict()
+    json_payload = b64decode(post_data['json_payload']).decode('utf-8')
+    stored_values = {}
+    for entry_dict in json_payload['entry']:
+        if entry_dict['resource']['resourceType'] == 'Immunization':
+            stored_values['doseNumberPositiveInt'] = entry_dict['resource']['protocolApplied'][0]['doseNumberPositiveInt']
+            stored_values['seriesDosesPositiveInt'] = entry_dict['resource']['protocolApplied'][0]['seriesDosesPositiveInt']
+            stored_values['vaccineCode'] = entry_dict['resource']['vaccineCode']['coding'][0]['code']
+        elif entry_dict['resource']['resourceType'] == 'Observation':
+            stored_values['valueString'] = entry_dict['resource']['valueString']
+            stored_values['observationCode'] = entry_dict['resource']['code']['coding'][0]['code']
+    created_datetime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
 def check_fhir_server_status(fhir_server):
     try:
         requests.get(fhir_server)
@@ -509,6 +527,39 @@ def create_fhir_server_table():
             [ServerId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
             [Server] NVARCHAR(100) NOT NULL,
             [Token] NVARCHAR(100) NULL
+        )
+    ''')
+    db_conn.commit()
+    db_conn.close()
+    return True
+
+def create_fhir_immunization_table():
+    db_conn = sqlite3.connect(gettempdir() + '/healthy_passport.sqlite3')
+    db_conn.cursor()
+    db_conn.execute('''
+        CREATE TABLE IF NOT EXISTS "immunization"(
+            [immunizationId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            [doseNumberPositiveInt] TINYINT NOT NULL,
+            [seriesDosesPositiveInt] TINYINT NOT NULL,
+            [vaccineCode] NVARCHAR(50) NOT NULL,
+            [createdDateTime] INT NOT NULL,
+            [Token] NVARCHAR(200) NULL
+        )
+    ''')
+    db_conn.commit()
+    db_conn.close()
+    return True
+
+def create_fhir_observation_table():
+    db_conn = sqlite3.connect(gettempdir() + '/healthy_passport.sqlite3')
+    db_conn.cursor()
+    db_conn.execute('''
+        CREATE TABLE IF NOT EXISTS "observation"(
+            [observationId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            [valueString] NVARCHAR(20) NOT NULL,
+            [observationCode] NVARCHAR(50) NOT NULL,
+            [createdDateTime] INT NOT NULL,
+            [Token] NVARCHAR(200) NULL
         )
     ''')
     db_conn.commit()
