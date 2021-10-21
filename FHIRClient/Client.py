@@ -93,11 +93,11 @@ class Client:
 
         return response
 
-    def get_immunization_bundle_resource_by_id(self, immunization_bundle_id):
+    def get_immunization_resource_by_search(self, search_params):
         self.headers['Accept'] = self.accept_header
-        fhir_server = self.fhir_server + '/Bundle/' + immunization_bundle_id
+        fhir_server = self.fhir_server + '/Immunization?' + search_params
         response = requests.get(fhir_server, headers=self.headers)
-        self.status_code_handler(response, 'get_immunization_bundle_resource_by_id')
+        self.status_code_handler(response, 'get_immunization_resource_by_search')
 
         return response
 

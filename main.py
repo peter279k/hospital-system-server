@@ -35,7 +35,7 @@ from datetime import datetime
 app = FastAPI()
 
 origins = [
-    'http://localhost:3000',
+    '*',
 ]
 
 app.add_middleware(CORSMiddleware, allow_origins=origins, allow_methods=['*'], allow_headers=['*'])
@@ -306,23 +306,6 @@ def get_immunization_resource_by_id(immunization_id: str, response: Response):
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
 
-# Create GET method API to query Immunization Bundle Resource by id
-@app.get('/api/GetImmunizationBundle/{immunization_bundle_id}')
-def get_immunization_bundle_resource_by_id(immunization_bundle_id: str, response: Response):
-    fhir_server_info = get_fhir_server_setting()
-    fhir_server = fhir_server_info[0]
-    fhir_token = fhir_server_info[1]
-    is_required_auth = fhir_token_existence(fhir_token)
-
-    if fhir_server is False:
-        response.status_code = status.HTTP_400_BAD_REQUEST
-        return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
-
-    fhir_client = Client(fhir_server, is_required_auth, fhir_token)
-    fhir_client_response = fhir_client.get_immunization_bundle_resource_by_id(immunization_bundle_id)
-    response.status_code = fhir_client_response.status_code
-    return loads(fhir_client_response.text)
-
 # Create GET method API to query Composition Resource by id
 @app.get('/api/GetComposition/{composition_id}')
 def get_composition_resource_by_id(composition_id: str, response: Response):
@@ -464,6 +447,33 @@ def create_bundle_resource(bundle_name, bundle_resource_model: BundleResourceMod
     response.status_code = fhir_client_response.status_code
     return loads(fhir_client_response.text)
 
+# Create POST method API to query Immunization bundle:
+'''
+1. By patient id
+2. By patient id and date
+3. By organization id and date
+'''
+@app.post('/api/SearchImmunization')
+def query_immunization_resource(search_params_model: FHIRServerSearchParamsModel, response: Response):
+    post_data = search_params_model.dict()
+    if check_json_field(post_data, 'search_params') is False:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'search_params field is missed.'}
+
+    fhir_server_info = get_fhir_server_setting()
+    fhir_server = fhir_server_info[0]
+    fhir_token = fhir_server_info[1]
+    is_required_auth = fhir_token_existence(fhir_token)
+
+    if fhir_server is False:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'Bad Request, FHIR Server setting is not found. Please use /api/fhir_server API firstly.'}
+
+    fhir_client = Client(fhir_server, is_required_auth, fhir_token)
+    fhir_client_response = fhir_client.get_immunization_resource_by_search(post_data['search_params'])
+    response.status_code = fhir_client_response.status_code
+    return loads(fhir_client_response.text)
+
 # Create GET method API to read hospital list CSV file and get hospital list JSON
 @app.get('/api/GetHospitalLists')
 def get_hospital_lists():
@@ -533,32 +543,15 @@ def create_fhir_server_table():
     db_conn.close()
     return True
 
-def create_fhir_immunization_table():
+def create_fhir_passport():
     db_conn = sqlite3.connect(gettempdir() + '/healthy_passport.sqlite3')
     db_conn.cursor()
     db_conn.execute('''
-        CREATE TABLE IF NOT EXISTS "immunization"(
-            [immunizationId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-            [doseNumberPositiveInt] TINYINT NOT NULL,
-            [seriesDosesPositiveInt] TINYINT NOT NULL,
-            [vaccineCode] NVARCHAR(50) NOT NULL,
-            [createdDateTime] INT NOT NULL,
-            [Token] NVARCHAR(200) NULL
-        )
-    ''')
-    db_conn.commit()
-    db_conn.close()
-    return True
-
-def create_fhir_observation_table():
-    db_conn = sqlite3.connect(gettempdir() + '/healthy_passport.sqlite3')
-    db_conn.cursor()
-    db_conn.execute('''
-        CREATE TABLE IF NOT EXISTS "observation"(
-            [observationId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-            [valueString] NVARCHAR(20) NOT NULL,
-            [observationCode] NVARCHAR(50) NOT NULL,
-            [createdDateTime] INT NOT NULL,
+        CREATE TABLE IF NOT EXISTS "passport_token"(
+            [PassportId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            [DoseNumberPositiveInt] TINYINT NOT NULL,
+            [SeriesDosesPositiveInt] TINYINT NOT NULL,
+            [CreatedDateTime] INT NOT NULL,
             [Token] NVARCHAR(200) NULL
         )
     ''')
