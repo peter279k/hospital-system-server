@@ -8,6 +8,7 @@ fastapi = "*"
 uvicorn = "*"
 requests = "*"
 hospital-system-server = {editable = true, path = "."}
+qrcode = {extras = ["pil"], version = "*"}
 
 [dev-packages]
 pytest = "*"
