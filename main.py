@@ -16,6 +16,9 @@ import requests
 # Import sqlite3 module
 import sqlite3
 
+# Import sha3 module
+from hashlib import sha3_384
+
 # Import gettempdir module
 from tempfile import gettempdir
 
@@ -26,10 +29,16 @@ from FHIRClient.Client import Client
 from json import loads
 
 # Import base64 decode module
-from base64 import b64decode
+from base64 import b64decode, b64encode
 
 # Import datetime module
 from datetime import datetime
+
+# Import qrcode module
+import qrcode
+
+# Import ByteIO function
+from io import BytesIO
 
 # Declaring as the main app to use FastAPI
 app = FastAPI()
@@ -472,6 +481,7 @@ def query_immunization_resource(search_params_model: FHIRServerSearchParamsModel
     fhir_client = Client(fhir_server, is_required_auth, fhir_token)
     fhir_client_response = fhir_client.get_immunization_resource_by_search(post_data['search_params'])
     response.status_code = fhir_client_response.status_code
+
     return loads(fhir_client_response.text)
 
 # Create GET method API to read hospital list CSV file and get hospital list JSON
@@ -494,21 +504,97 @@ def get_hospital_lists():
 
     return response_json
 
-# Create POST method API to generate related QRCode with specific bundle id
+class RequestRecordModel(BaseModel):
+    identifier_number: str
+
+# Create POST method API to query Database by specific hashed identifier number
+@app.post('/api/GetDatabaseRecord')
+def get_database_record(request_record_model: RequestRecordModel, response: Response):
+    post_data = request_record_model.dict()
+    if check_json_field(post_data, 'identifier_number') is False:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'identifier_number field is missed.'}
+    hashed_identifier_number = sha3_384_hash(post_data['identifier_number'])
+    query_result = query_database_by_hashed_identified_number(hashed_identifier_number)
+    if query_result is False:
+        response.status_code = status.HTTP_410_GONE
+        return {'error': 'cannot find immunization record'}
+
+    return {
+        'DoseNumberPositiveInt': query_result[0],
+        'lastOccurrenceDate': query_result[1],
+        'hashedIdentifierNumber': query_result[2],
+        'createdTokenDateTime': query_result[3],
+        'Token': query_result[4],
+        'base64EncodedImage': generate_qr_code_image(query_result[4]),
+    }
+
+class InsertPassportTokenModel(BaseModel):
+    dose_number_positive_int: int
+    last_occurrence_date: int
+    identifier_number: str
+    immunization_id: str
+
+# Create POST method API to insert passport token table
+@app.post('/api/InsertDatabaseRecord')
+def insert_immunization_record(insert_passport_token_model: InsertPassportTokenModel, response: Response):
+    post_data = insert_passport_token_model.dict()
+    if check_json_field(post_data, 'dose_number_positive_int') is False:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'dose_number_positive_int field is missed.'}
+    if check_json_field(post_data, 'last_occurrence_date') is False:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'last_occurrence_date field is missed.'}
+    if check_json_field(post_data, 'identifier_number') is False:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'identifier_number field is missed.'}
+    if check_json_field(post_data, 'immunization_id') is False:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'immunization_id field is missed.'}
+
+    hashed_identifier_number = sha3_384_hash(post_data['identifier_number'])
+    record = [
+        post_data['dose_number_positive_int'],
+        post_data['last_occurrence_date'],
+        hashed_identifier_number,
+        int(datetime.now().timestamp()),
+        sha3_384_hash(post_data['immunization_id']),
+    ]
+    store_fhir_passport_token(record)
+
+    return {'result': 'inserting immunization record is done!'}
+
+# Create POST method API to generate QRCode image with validation URL by identifier number
 @app.post('/api/GenerateQRCode')
-def generate_qrcode(bundle_resource_model: BundleResourceModel, response: Response):
-    post_data = bundle_resource_model.dict()
-    json_payload = b64decode(post_data['json_payload']).decode('utf-8')
-    stored_values = {}
-    for entry_dict in json_payload['entry']:
-        if entry_dict['resource']['resourceType'] == 'Immunization':
-            stored_values['doseNumberPositiveInt'] = entry_dict['resource']['protocolApplied'][0]['doseNumberPositiveInt']
-            stored_values['seriesDosesPositiveInt'] = entry_dict['resource']['protocolApplied'][0]['seriesDosesPositiveInt']
-            stored_values['vaccineCode'] = entry_dict['resource']['vaccineCode']['coding'][0]['code']
-        elif entry_dict['resource']['resourceType'] == 'Observation':
-            stored_values['valueString'] = entry_dict['resource']['valueString']
-            stored_values['observationCode'] = entry_dict['resource']['code']['coding'][0]['code']
-    created_datetime = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+def generate_qr_code(request_payload_model: RequestRecordModel, response: Response):
+    post_data = request_payload_model.dict()
+    if check_json_field(post_data, 'identifier_number') is False:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'identifier_number field is missed.'}
+
+    hashed_identifier_number = sha3_384_hash(post_data['identifier_number'])
+    query_result = query_database_by_hashed_identified_number(hashed_identifier_number)
+
+    if len(query_result) == 0:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'no record found by this identifier number on this table.'}
+
+    return {
+        'dose_number_positive_int': query_result[0],
+        'last_occurrence_date': query_result[1],
+        'hashed_identifier_number': query_result[2],
+        'created_token_date_time': query_result[3],
+        'token': query_result[4],
+        'base64_encoded_image': generate_qr_code_image(query_result[4]),
+    }
+
+def generate_qr_code_image(hashed_token):
+    validation_url = 'http://localhost:3001?validate=' + hashed_token
+    image = qrcode.make(validation_url)
+    output_binary = BytesIO()
+    image.save(output_binary, format='PNG')
+
+    return b64encode(output_binary.getvalue())
 
 def check_fhir_server_status(fhir_server):
     try:
@@ -543,18 +629,41 @@ def create_fhir_server_table():
     db_conn.close()
     return True
 
-def create_fhir_passport():
+def create_fhir_passport_table():
     db_conn = sqlite3.connect(gettempdir() + '/healthy_passport.sqlite3')
     db_conn.cursor()
     db_conn.execute('''
         CREATE TABLE IF NOT EXISTS "passport_token"(
             [PassportId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
             [DoseNumberPositiveInt] TINYINT NOT NULL,
-            [SeriesDosesPositiveInt] TINYINT NOT NULL,
-            [CreatedDateTime] INT NOT NULL,
+            [lastOccurrenceDate] NVARCHAR(15) NOT NULL,
+            [hashedIdentifierNumber] NVARCHAR(150) NOT NULL,
+            [createdTokenDateTime] INT NOT NULL,
             [Token] NVARCHAR(200) NULL
         )
     ''')
+    db_conn.commit()
+    db_conn.close()
+    return True
+
+def store_fhir_passport_token(record):
+    create_fhir_passport_table()
+    db_conn = sqlite3.connect(gettempdir() + '/healthy_passport.sqlite3')
+    db_conn.cursor()
+    db_conn.execute(
+        '''
+        INSERT INTO passport_token
+        (
+            DoseNumberPositiveInt,
+            lastOccurrenceDate,
+            hashedIdentifierNumber,
+            createdTokenDateTime,
+            Token
+        )
+        VALUES (?, ?, ?, ?, ?)
+        ''',
+        record
+    )
     db_conn.commit()
     db_conn.close()
     return True
@@ -570,6 +679,28 @@ def store_fhir_server_setting(fhir_server, fhir_token=None):
     db_conn.close()
     return True
 
+def query_database_by_hashed_identified_number(hashed_identifier_number):
+    create_fhir_passport_table()
+    db_conn = sqlite3.connect(gettempdir() + '/healthy_passport.sqlite3')
+    db_conn.cursor()
+    fetched_obj = db_conn.execute(
+        '''
+        SELECT
+            DoseNumberPositiveInt,
+            lastOccurrenceDate,
+            hashedIdentifierNumber,
+            createdTokenDateTime,
+            Token
+        FROM passport_token WHERE hashedIdentifierNumber=? ORDER BY PassportId DESC LIMIT 1
+        ''', [hashed_identifier_number])
+    fetched_result = fetched_obj.fetchone()
+    db_conn.close()
+
+    if fetched_result is None:
+        return False
+
+    return fetched_result
+
 def get_fhir_server_setting():
     create_fhir_server_table()
     db_conn = sqlite3.connect(gettempdir() + '/hospital_system_server.sqlite3')
@@ -578,9 +709,12 @@ def get_fhir_server_setting():
     fetched_result = fetched_obj.fetchone()
     db_conn.close()
 
-    if len(fetched_result) == 0:
+    if fetched_result is None:
         return False
     return fetched_result
 
 def fhir_token_existence(fhir_token):
     return fhir_token is not None
+
+def sha3_384_hash(identifier_number):
+    return sha3_384(str(identifier_number).encode('utf-8')).hexdigest()
