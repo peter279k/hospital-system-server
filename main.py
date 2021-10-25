@@ -13,6 +13,9 @@ from typing import Optional
 # Import requests module
 import requests
 
+# Import random module
+import random
+
 # Import sqlite3 module
 import sqlite3
 
@@ -521,6 +524,13 @@ def get_database_record(request_record_model: RequestRecordModel, response: Resp
         response.status_code = status.HTTP_410_GONE
         return {'error': 'cannot find immunization record'}
 
+    if check_expired_token(query_result[3]) is True:
+        query_result = list(query_result)
+        query_result[3] = int(datetime.now().timestamp())
+        random.seed()
+        query_result[4] = sha3_384_hash(str(random.random()) + str(query_result[3]))
+        store_fhir_passport_token(query_result)
+
     return {
         'DoseNumberPositiveInt': query_result[0],
         'lastOccurrenceDate': query_result[1],
@@ -589,13 +599,41 @@ def generate_qr_code(request_payload_model: RequestRecordModel, response: Respon
         'base64_encoded_image': generate_qr_code_image(post_data['ip_address'], query_result[4]),
     }
 
+class TokenPayloadModel(BaseModel):
+    token: str
+
+# Create POST method API to validate QRCode image token
+@app.post('/api/ValidateQRCode')
+def validate_qr_code(token_payload_model: TokenPayloadModel, response: Response):
+    post_data = token_payload_model.dict()
+    if check_json_field(post_data, 'token') is False:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'token field is missed.'}
+
+    query_result = query_database_by_token(post_data['token'])
+
+    if query_result is False:
+        response.status_code = status.HTTP_410_GONE
+        return {'error': 'no record found by this token on this table.'}
+
+    if check_expired_token(query_result[3]) is True:
+        response.status_code = status.HTTP_410_GONE
+        return {'error': 'Token is expired.'}
+
+    return {
+        'validation_result': 'Success',
+    }
+
 def generate_qr_code_image(ip_address, hashed_token):
-    validation_url = ip_address + '?validate=' + hashed_token
+    validation_url = ip_address + '/validate?token=' + hashed_token
     image = qrcode.make(validation_url)
     output_binary = BytesIO()
     image.save(output_binary, format='PNG')
 
     return b64encode(output_binary.getvalue())
+
+def check_expired_token(token):
+    return int(datetime.now().timestamp() - int(token) / 1000.0) > 180
 
 def check_fhir_server_status(fhir_server):
     try:
@@ -679,6 +717,28 @@ def store_fhir_server_setting(fhir_server, fhir_token=None):
     db_conn.commit()
     db_conn.close()
     return True
+
+def query_database_by_token(token):
+    create_fhir_passport_table()
+    db_conn = sqlite3.connect(gettempdir() + '/healthy_passport.sqlite3')
+    db_conn.cursor()
+    fetched_obj = db_conn.execute(
+        '''
+        SELECT
+            DoseNumberPositiveInt,
+            lastOccurrenceDate,
+            hashedIdentifierNumber,
+            createdTokenDateTime,
+            Token
+        FROM passport_token WHERE Token=? ORDER BY PassportId DESC LIMIT 1
+        ''', [token])
+    fetched_result = fetched_obj.fetchone()
+    db_conn.close()
+
+    if fetched_result is None:
+        return False
+
+    return fetched_result
 
 def query_database_by_hashed_identified_number(hashed_identifier_number):
     create_fhir_passport_table()
