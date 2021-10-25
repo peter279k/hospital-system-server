@@ -506,6 +506,7 @@ def get_hospital_lists():
 
 class RequestRecordModel(BaseModel):
     identifier_number: str
+    ip_address: str
 
 # Create POST method API to query Database by specific hashed identifier number
 @app.post('/api/GetDatabaseRecord')
@@ -526,7 +527,7 @@ def get_database_record(request_record_model: RequestRecordModel, response: Resp
         'hashedIdentifierNumber': query_result[2],
         'createdTokenDateTime': query_result[3],
         'Token': query_result[4],
-        'base64EncodedImage': generate_qr_code_image(query_result[4]),
+        'base64EncodedImage': generate_qr_code_image(post_data['ip_address'], query_result[4]),
     }
 
 class InsertPassportTokenModel(BaseModel):
@@ -585,11 +586,11 @@ def generate_qr_code(request_payload_model: RequestRecordModel, response: Respon
         'hashed_identifier_number': query_result[2],
         'created_token_date_time': query_result[3],
         'token': query_result[4],
-        'base64_encoded_image': generate_qr_code_image(query_result[4]),
+        'base64_encoded_image': generate_qr_code_image(post_data['ip_address'], query_result[4]),
     }
 
-def generate_qr_code_image(hashed_token):
-    validation_url = 'http://localhost:3001?validate=' + hashed_token
+def generate_qr_code_image(ip_address, hashed_token):
+    validation_url = ip_address + '?validate=' + hashed_token
     image = qrcode.make(validation_url)
     output_binary = BytesIO()
     image.save(output_binary, format='PNG')
