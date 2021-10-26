@@ -632,8 +632,8 @@ def generate_qr_code_image(ip_address, hashed_token):
 
     return b64encode(output_binary.getvalue())
 
-def check_expired_token(token):
-    return int(datetime.now().timestamp() - int(token) / 1000.0) > 180
+def check_expired_token(created_token_time):
+    return (int(datetime.now().timestamp()) - int(created_token_time)) > 180
 
 def check_fhir_server_status(fhir_server):
     try:
