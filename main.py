@@ -691,6 +691,12 @@ def store_fhir_passport_token(record):
     db_conn.cursor()
     db_conn.execute(
         '''
+            DELETE FROM passport_token WHERE hashedIdentifierNumber = ?
+        ''',
+        [record[2]]
+    )
+    db_conn.execute(
+        '''
         INSERT INTO passport_token
         (
             DoseNumberPositiveInt,
@@ -710,6 +716,11 @@ def store_fhir_passport_token(record):
 def store_fhir_server_setting(fhir_server, fhir_token=None):
     create_fhir_server_table()
     db_conn = sqlite3.connect(gettempdir() + '/hospital_system_server.sqlite3')
+    db_conn.cursor()
+
+    db_conn.execute('DELETE FROM fhir_server')
+    db_conn.commit()
+
     if fhir_token is None:
         db_conn.execute('INSERT INTO fhir_server(Server) VALUES (?)', [fhir_server])
     else:
