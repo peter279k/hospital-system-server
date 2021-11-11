@@ -654,6 +654,32 @@ def check_json_str(json_payload):
 def check_json_field(post_data, key_name):
     return key_name in list(post_data.keys())
 
+def create_vaccine_register_table():
+    db_conn = sqlite3.connect(gettempdir() + '/hospital_system_server.sqlite3')
+    db_conn.cursor()
+    db_conn.execute('''
+        CREATE TABLE IF NOT EXISTS "vaccine_register"(
+            [RegisterId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            [VaccinePersonName] NVARCHAR(100) NOT NULL,
+            [VaccinePersonFirstName] NVARCHAR(100) NOT NULL,
+            [VaccinePersonLastName] NVARCHAR(100) NOT NULL,
+            [CountryName] NVARCHAR(100) NOT NULL,
+            [IdentityNumber] NVARCHAR(100) NOT NULL,
+            [DoseListId] NVARCHAR(100) NOT NULL
+        )
+    ''')
+    db_conn.execute('''
+        CREATE TABLE IF NOT EXISTS "vaccine_dose_lists"(
+            [ListId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            [DosManufactureName] NVARCHAR(50) NOT NULL,
+            [VaccineDate] NVARCHAR(50) NOT NULL,
+            [DoseListId] NVARCHAR(100) NOT NULL
+        )
+    ''')
+    db_conn.commit()
+    db_conn.close()
+    return True
+
 def create_fhir_server_table():
     db_conn = sqlite3.connect(gettempdir() + '/hospital_system_server.sqlite3')
     db_conn.cursor()
