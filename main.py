@@ -16,6 +16,9 @@ import requests
 # Import random module
 import random
 
+# Import secrets.token_hex module
+from secrets import token_hex
+
 # Import sqlite3 module
 import sqlite3
 
@@ -624,6 +627,62 @@ def validate_qr_code(token_payload_model: TokenPayloadModel, response: Response)
         'validation_result': 'Success',
     }
 
+class VaccineRegisterModel(BaseModel):
+    vaccinePersonName: str
+    vaccinePersonEnFirstName: Optional[str] = None
+    vaccinePersonEnLastName: Optional[str] = None
+    countryName: Optional[str] = None
+    identityNumber: str
+    doseInputList: str
+
+# Create POST method API to create vaccine register list
+@app.post('/api/RegisterVaccine')
+def register_vaccine(vaccine_register_model: VaccineRegisterModel, response: Response):
+    post_data = vaccine_register_model.dict()
+    if check_json_field(post_data, 'vaccinePersonName') is False:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'vaccinePersonName field is missed.'}
+    if check_json_field(post_data, 'identityNumber') is False:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'identityNumber field is missed.'}
+    if check_json_field(post_data, 'doseInputList') is False:
+        response.status_code = status.HTTP_400_BAD_REQUEST
+        return {'error': 'doseInputList field is missed.'}
+
+    dose_json_str = b64decode(post_data['doseInputList']).decode('utf-8')
+    check_result = check_json_str(dose_json_str)
+    if check_result is not True:
+        response.status_code = status.HTTP_422_UNPROCESSABLE_ENTITY
+        return check_result
+
+    dose_list_id = token_hex()
+    hashed_identity_number = sha3_384_hash(post_data['identityNumber'])
+    user_info = [
+        post_data['vaccinePersonName'],
+        post_data['vaccinePersonEnFirstName'],
+        post_data['vaccinePersonEnLastName'],
+        post_data['countryName'],
+        hashed_identity_number,
+        dose_list_id,
+    ]
+    fetched_result = query_vaccine_register_exists(hashed_identity_number)
+    if fetched_result is not False:
+        dose_list_id = fetched_result[0]
+
+    vaccine_record = []
+    dose_json_obj = loads(dose_json_str)
+    for dose_list in dose_json_obj:
+        vaccine_record.append([
+            dose_list['doseManufactureName'],
+            dose_list['doseNumber'],
+            dose_list['vaccinateDateStr'],
+            dose_list_id,
+        ])
+
+    store_vaccine_register(user_info, vaccine_record, fetched_result)
+
+    return {'result': '成功註冊疫苗紀錄！'}
+
 def generate_qr_code_image(ip_address, hashed_token):
     validation_url = ip_address + '/validate?token=' + hashed_token
     image = qrcode.make(validation_url)
@@ -661,19 +720,25 @@ def create_vaccine_register_table():
         CREATE TABLE IF NOT EXISTS "vaccine_register"(
             [RegisterId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
             [VaccinePersonName] NVARCHAR(100) NOT NULL,
-            [VaccinePersonFirstName] NVARCHAR(100) NOT NULL,
-            [VaccinePersonLastName] NVARCHAR(100) NOT NULL,
-            [CountryName] NVARCHAR(100) NOT NULL,
+            [VaccinePersonFirstName] NVARCHAR(100) NULL,
+            [VaccinePersonLastName] NVARCHAR(100) NULL,
+            [CountryName] NVARCHAR(100) NULL,
             [IdentityNumber] NVARCHAR(100) NOT NULL,
             [DoseListId] NVARCHAR(100) NOT NULL
         )
     ''')
+    db_conn.commit()
+
     db_conn.execute('''
         CREATE TABLE IF NOT EXISTS "vaccine_dose_lists"(
             [ListId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-            [DosManufactureName] NVARCHAR(50) NOT NULL,
+            [DoseManufactureName] NVARCHAR(50) NOT NULL,
+            [DoseNumber] INT NOT NULL,
             [VaccineDate] NVARCHAR(50) NOT NULL,
-            [DoseListId] NVARCHAR(100) NOT NULL
+            [DoseListId] NVARCHAR(100) NOT NULL,
+            CONSTRAINT fk_dose_list_id
+                FOREIGN KEY (DoseListId)
+                REFERENCES vaccine_register(DoseListId)
         )
     ''')
     db_conn.commit()
@@ -752,6 +817,50 @@ def store_fhir_server_setting(fhir_server, fhir_token=None):
     else:
         db_conn.execute('INSERT INTO fhir_server(Server, Token) VALUES (?, ?)', [fhir_server, fhir_token])
     db_conn.commit()
+    db_conn.close()
+    return True
+
+def query_vaccine_register_exists(identity_number):
+    create_vaccine_register_table()
+    db_conn = sqlite3.connect(gettempdir() + '/hospital_system_server.sqlite3')
+    db_conn.cursor()
+    fetched_obj = db_conn.execute('''
+        SELECT DoseListId FROM vaccine_register WHERE
+        IdentityNumber = ?
+    ''', [identity_number])
+    fetched_result = fetched_obj.fetchone()
+    db_conn.close()
+
+    if fetched_result is None:
+        return False
+
+    return fetched_result
+
+def store_vaccine_register(user_info, vaccine_records, fetched_result):
+    create_vaccine_register_table()
+    db_conn = sqlite3.connect(gettempdir() + '/hospital_system_server.sqlite3')
+    db_conn.cursor()
+    if fetched_result is False:
+        db_conn.execute('''
+            INSERT INTO vaccine_register(
+                VaccinePersonName,
+                VaccinePersonFirstName,
+                VaccinePersonLastName,
+                CountryName,
+                IdentityNumber,
+                DoseListId
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        ''', user_info)
+        db_conn.commit()
+
+    for vaccine_record in vaccine_records:
+        db_conn.execute('''
+            INSERT INTO vaccine_dose_lists(
+                DoseManufactureName, DoseNumber, VaccineDate, DoseListId
+            ) VALUES (?, ?, ?, ?)
+        ''', vaccine_record)
+        db_conn.commit()
+
     db_conn.close()
     return True
 
