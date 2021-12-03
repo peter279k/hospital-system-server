@@ -25,11 +25,17 @@ import sqlite3
 # Import sha3 module
 from hashlib import sha3_384
 
+# Import sha3 module
+from hashlib import sha256
+
 # Import gettempdir module
 from tempfile import gettempdir
 
 # Import FHIR Client class
 from FHIRClient.Client import Client
+
+# Import TWCA Client class
+from TWCAClient.Client import Client as TWCAClient
 
 # Import json.loads module
 from json import loads
@@ -45,6 +51,15 @@ import qrcode
 
 # Import ByteIO function
 from io import BytesIO
+
+# Import isfile function
+from os.path import isfile
+
+# Import uuid4 function
+from uuid import uuid4
+
+# Import dumps function
+from json import dumps
 
 # Declaring as the main app to use FastAPI
 app = FastAPI()
@@ -683,6 +698,54 @@ def register_vaccine(vaccine_register_model: VaccineRegisterModel, response: Res
 
     return {'result': '成功註冊疫苗紀錄！'}
 
+class LoginTWIDPortalModel(BaseModel):
+    member_no: str
+    action: str
+    plain_text: str
+    ca_type: str
+    assign_cert_password: str
+    operator: str
+    msisdn: str
+    birthday: str
+
+# Create POST method API to login TWID Portal
+@app.post('/api/LoginTWIDPortal')
+def login_twid_portal(login_twid_portal_model: LoginTWIDPortalModel, response: Response):
+    portal_server = 'https://midonlinetest.twca.com.tw/IDPortal/Login'
+    twca_client = Client(portal_server)
+    twca_config = get_twca_config()
+    post_data = login_twid_portal_model.dict()
+    input_params = {
+        'MemberNo': post_data['member_no'],
+        'Action': post_data['action'],
+        'Plaintext': post_data['member_no'],
+        'CAType': post_data['ca_type'],
+        'AssignCertPassword': post_data['assign_cert_password'],
+        'MIDInputParams': {
+            'Platform': '2',
+            'MIDwInputParams': {
+                'Operator': post_data['operator'],
+                'Msisdn': post_data['msisdn'],
+                'Birthday': post_data['birthday'],
+            },
+        },
+    }
+    verify_no = get_verify_no()
+    return_params = ''
+    plain_text = twca_config['business_no'] + '1.0' + twca_config['hash_key_no'] + verify_no + return_params + dumps(input_params) + twca_config['hash_key']
+    payload = {
+        'BusinessNo': twca_config['business_no'],
+        'ApiVersion': '1.0',
+        'HashKeyNo': twca_config['hash_key_no'],
+        'VerifyNo': verify_no,
+        'ReturnURL': post_data['return_url'],
+        'ReturnParams': '',
+        'IdentifyNo': identify_generator(plain_text),
+        'InputParams': dumps(input_params),
+    }
+
+    return twca_client.login_portal(payload)
+
 def generate_qr_code_image(ip_address, hashed_token):
     validation_url = ip_address + '/validate?token=' + hashed_token
     image = qrcode.make(validation_url)
@@ -925,3 +988,34 @@ def fhir_token_existence(fhir_token):
 
 def sha3_384_hash(identifier_number):
     return sha3_384(str(identifier_number).encode('utf-8')).hexdigest()
+
+def get_twca_config():
+    default_config_path = './config.txt'
+    if isfile(default_config_path) is False:
+        return {
+            'error': 'config.txt file is not found',
+        }
+
+    with open(default_config_path, 'r') as file_handler:
+        contents = file_handler.read().split('\n')
+        business_no = contents[0].split(':')[1]
+        hash_key = contents[1].split(':')[1]
+        hash_key_no = contents[2].split(':')[1]
+
+    return {
+        'business_no': business_no,
+        'hash_key': hash_key,
+        'hash_key_no': hash_key_no,
+    }
+
+def get_verify_no():
+    return str(uuid4())
+
+def store_verify_no(verify_no):
+    return True
+
+def identify_generator(plain_text):
+    encoded = plain_text.encode('utf-16le')
+    hashed = sha256(encoded)
+
+    return hashed.hexdigest()
