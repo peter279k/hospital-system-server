@@ -788,6 +788,7 @@ def login_twid_portal(login_twid_portal_model: LoginTWIDPortalModel, response: R
     token = output_params['Token']
     plain_text = twca_config['business_no'] + api_version + twca_config['hash_key_no'] + verify_no + token + twca_config['hash_key']
     token_response['IdentifyNo'] = identify_generator(plain_text)
+    store_verify_no(verify_no, token_response['IdentifyNo'])
 
     return token_response
 
@@ -1056,7 +1057,36 @@ def get_twca_config():
 def get_verify_no():
     return str(uuid4()).replace('-', '')
 
-def store_verify_no(verify_no):
+def store_verify_no(verify_no, identify_no):
+    create_verify_no()
+    created_time = int(datetime.now().timestamp())
+    db_conn = sqlite3.connect(gettempdir() + '/healthy_passport.sqlite3')
+    db_conn.cursor()
+    db_conn.execute('''
+        INSERT INTO twid_verify_no(
+            IdentifyNo,
+            VerifyNo,
+            CreatedTokenDateTime
+        ) VALUES (?, ?, ?)'
+    ''', [verify_no, identify_no, created_time])
+    db_conn.commit()
+    db_conn.close()
+
+    return True
+
+def create_verify_no():
+    db_conn = sqlite3.connect(gettempdir() + '/healthy_passport.sqlite3')
+    db_conn.cursor()
+    db_conn.execute('''
+        CREATE TABLE IF NOT EXISTS "twid_verify_no"(
+            [ListId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+            [IdentifyNo] NVARCHAR(150) NOT NULL,
+            [VerifyNo] NVARCHAR(70) NOT NULL,
+            [CreatedTokenDateTime] INT NOT NULL
+        )
+    ''')
+    db_conn.commit()
+    db_conn.close()
     return True
 
 def identify_generator(plain_text):
