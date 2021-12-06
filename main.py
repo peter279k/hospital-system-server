@@ -787,7 +787,8 @@ def login_twid_portal(login_twid_portal_model: LoginTWIDPortalModel, response: R
     output_params = loads(token_response['OutputParams'])
     token = output_params['Token']
     plain_text = twca_config['business_no'] + api_version + twca_config['hash_key_no'] + verify_no + token + twca_config['hash_key']
-    token_response['IdentifyNo'] = sha256(str(plain_text).encode('utf-8')).hexdigest()
+    token_response['IdentifyNo'] = identify_generator(plain_text)
+    print(token_response['IdentifyNo'])
 
     return token_response
 
