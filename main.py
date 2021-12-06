@@ -1,5 +1,5 @@
 # Calling the FastAPI library
-from fastapi import FastAPI, Response, status
+from fastapi import FastAPI, Response, Form, status
 
 # Add CORS middleware module
 from fastapi.middleware.cors import CORSMiddleware
@@ -698,6 +698,33 @@ def register_vaccine(vaccine_register_model: VaccineRegisterModel, response: Res
 
     return {'result': '成功註冊疫苗紀錄！'}
 
+# Create POST method API to get verified result from TWID Portal
+@app.post('/api/VerifyResult')
+def verify_result(
+    BusinessNo: str = Form(...),
+    ApiVersion: str = Form(...),
+    HashKeyNo: str = Form(...),
+    VerifyNo: str = Form(...),
+    MemberNoMapping: str = Form(...),
+    Token: str = Form(...),
+    CAType: str = Form(...),
+    ResultCode: str = Form(...),
+    ResultCodeDesc: str = Form(...),
+    IdentifyNo: str = Form(...),
+    ):
+    return {
+        'BusinessNo': BusinessNo,
+        'ApiVersion': ApiVersion,
+        'HashKeyNo': HashKeyNo,
+        'VerifyNo': VerifyNo,
+        'MemberNoMapping': MemberNoMapping,
+        'Token': Token,
+        'CAType': CAType,
+        'ResultCode': ResultCode,
+        'ReturnCodeDesc': ResultCodeDesc,
+        'IdentifyNo': IdentifyNo,
+    }
+
 class LoginTWIDPortalModel(BaseModel):
     member_no: str
     action: str
@@ -707,13 +734,19 @@ class LoginTWIDPortalModel(BaseModel):
     operator: str
     msisdn: str
     birthday: str
+    return_url: str
 
 # Create POST method API to login TWID Portal
 @app.post('/api/LoginTWIDPortal')
 def login_twid_portal(login_twid_portal_model: LoginTWIDPortalModel, response: Response):
     portal_server = 'https://midonlinetest.twca.com.tw/IDPortal/Login'
-    twca_client = Client(portal_server)
+    twca_client = TWCAClient(portal_server)
     twca_config = get_twca_config()
+    if 'error' in twca_config.keys():
+        response.status_code = status.HTTP_400_BAD_REQUEST
+
+        return twca_config
+
     post_data = login_twid_portal_model.dict()
     input_params = {
         'MemberNo': post_data['member_no'],
@@ -732,7 +765,8 @@ def login_twid_portal(login_twid_portal_model: LoginTWIDPortalModel, response: R
     }
     verify_no = get_verify_no()
     return_params = ''
-    plain_text = twca_config['business_no'] + '1.0' + twca_config['hash_key_no'] + verify_no + return_params + dumps(input_params) + twca_config['hash_key']
+    api_version = '1.0'
+    plain_text = twca_config['business_no'] + api_version + twca_config['hash_key_no'] + verify_no + return_params + dumps(input_params) + twca_config['hash_key']
     payload = {
         'BusinessNo': twca_config['business_no'],
         'ApiVersion': '1.0',
@@ -744,7 +778,16 @@ def login_twid_portal(login_twid_portal_model: LoginTWIDPortalModel, response: R
         'InputParams': dumps(input_params),
     }
 
-    return twca_client.login_portal(payload)
+    token_response = twca_client.login_portal(payload)
+    if token_response['ReturnCode'] != '0':
+        return token_response
+
+    output_params = loads(token_response['OutputParams'])
+    token = output_params['Token']
+    plain_text = twca_config['business_no'] + api_version + twca_config['hash_key_no'] + verify_no + post_data['member_no'] + token + twca_config['hash_key']
+    token_response['IdentifyNo'] = identify_generator(plain_text)
+
+    return token_response
 
 def generate_qr_code_image(ip_address, hashed_token):
     validation_url = ip_address + '/validate?token=' + hashed_token
