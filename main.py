@@ -771,7 +771,7 @@ def login_twid_portal(login_twid_portal_model: LoginTWIDPortalModel, response: R
     plain_text = twca_config['business_no'] + api_version + twca_config['hash_key_no'] + verify_no + return_params + dumps(input_params) + twca_config['hash_key']
     payload = {
         'BusinessNo': twca_config['business_no'],
-        'ApiVersion': '1.0',
+        'ApiVersion': api_version,
         'HashKeyNo': twca_config['hash_key_no'],
         'VerifyNo': verify_no,
         'ReturnURL': post_data['return_url'],
