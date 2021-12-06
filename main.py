@@ -701,16 +701,17 @@ def register_vaccine(vaccine_register_model: VaccineRegisterModel, response: Res
 # Create POST method API to get verified result from TWID Portal
 @app.post('/api/VerifyResult')
 def verify_result(
-    BusinessNo: str = Form(...),
-    ApiVersion: str = Form(...),
-    HashKeyNo: str = Form(...),
-    VerifyNo: str = Form(...),
-    MemberNoMapping: str = Form(...),
-    Token: str = Form(...),
-    CAType: str = Form(...),
-    ResultCode: str = Form(...),
-    ResultCodeDesc: str = Form(...),
-    IdentifyNo: str = Form(...),
+        BusinessNo: str = Form(...),
+        ApiVersion: str = Form(...),
+        HashKeyNo: str = Form(...),
+        VerifyNo: str = Form(...),
+        MemberNoMapping: str = Form(...),
+        Token: str = Form(...),
+        CAType: str = Form(...),
+        ResultCode: str = Form(...),
+        ReturnCode: str = Form(...),
+        ReturnCodeDesc: str = Form(...),
+        IdentifyNo: str = Form(...),
     ):
     return {
         'BusinessNo': BusinessNo,
@@ -721,7 +722,8 @@ def verify_result(
         'Token': Token,
         'CAType': CAType,
         'ResultCode': ResultCode,
-        'ReturnCodeDesc': ResultCodeDesc,
+        'ReturnCode': ReturnCode,
+        'ReturnCodeDesc': ReturnCodeDesc,
         'IdentifyNo': IdentifyNo,
     }
 
