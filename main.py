@@ -727,6 +727,7 @@ def verify_result(
             'Error': 'QueryVerifyResult is failed to find member no.',
         }
 
+    member_no = member_no[0]
     portal_server = 'https://midonlinetest.twca.com.tw/IDPortal/QueryVerifyResult'
     twca_config = get_twca_config()
     plain_text = BusinessNo + ApiVersion + HashKeyNo + VerifyNo + member_no + Token + twca_config['hash_key']
