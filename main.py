@@ -1098,7 +1098,7 @@ def get_verify_no():
 
 def update_do_verify_no(login_token, do_return_code, do_result_code):
     create_verify_no()
-    db_conn = sqlite3.connect(gettempdir() + '/healthy_passport.sqlite3')
+    db_conn = sqlite3.connect('/var/tmp/healthy_passport.sqlite3')
     db_conn.cursor()
     db_conn.execute('''
         UPDATE twid_verify_no
@@ -1112,7 +1112,7 @@ def update_do_verify_no(login_token, do_return_code, do_result_code):
 
 def update_query_verify_no(login_token, query_return_code, query_result_code, query_time):
     create_verify_no()
-    db_conn = sqlite3.connect(gettempdir() + '/healthy_passport.sqlite3')
+    db_conn = sqlite3.connect('/var/tmp/healthy_passport.sqlite3')
     db_conn.cursor()
     db_conn.execute('''
         UPDATE twid_verify_no
@@ -1125,7 +1125,7 @@ def update_query_verify_no(login_token, query_return_code, query_result_code, qu
     return True
 
 def query_member_no_by_token(token):
-    db_conn = sqlite3.connect(gettempdir() + '/healthy_passport.sqlite3')
+    db_conn = sqlite3.connect('/var/tmp/healthy_passport.sqlite3')
     db_conn.cursor()
     fetched_obj = db_conn.execute('''
         SELECT MemberNo FROM twid_verify_no
@@ -1142,7 +1142,7 @@ def query_member_no_by_token(token):
 def store_verify_no(verify_no, identify_no, login_token, member_no, login_result_code, login_return_code, login_time):
     create_verify_no()
     created_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    db_conn = sqlite3.connect(gettempdir() + '/healthy_passport.sqlite3')
+    db_conn = sqlite3.connect('/var/tmp/healthy_passport.sqlite3')
     db_conn.cursor()
     db_conn.execute('''
         INSERT INTO twid_verify_no(
@@ -1171,7 +1171,7 @@ def store_verify_no(verify_no, identify_no, login_token, member_no, login_result
     return True
 
 def create_verify_no():
-    db_conn = sqlite3.connect(gettempdir() + '/healthy_passport.sqlite3')
+    db_conn = sqlite3.connect('/var/tmp/healthy_passport.sqlite3')
     db_conn.cursor()
     db_conn.execute('''
         CREATE TABLE IF NOT EXISTS "twid_verify_no"(
