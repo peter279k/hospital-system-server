@@ -706,7 +706,7 @@ def query_verified_result():
     return {}
 
 # Create POST method API to get verified result from TWID Portal
-@app.post('/api/VerifyResult')
+@app.post('/TWCA-api/api/VerifyResult')
 def verify_result(
         BusinessNo: str = Form(...),
         ApiVersion: str = Form(...),
@@ -772,7 +772,7 @@ class LoginTWIDPortalModel(BaseModel):
     return_url: str
 
 # Create POST method API to login TWID Portal
-@app.post('/api/LoginTWIDPortal')
+@app.post('/TWCA-api/api/LoginTWIDPortal')
 def login_twid_portal(login_twid_portal_model: LoginTWIDPortalModel, response: Response):
     twca_config = get_twca_config()
     if 'error' in twca_config.keys():
