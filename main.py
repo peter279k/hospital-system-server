@@ -61,6 +61,8 @@ from uuid import uuid4
 # Import dumps function
 from json import dumps
 
+from requests.api import post
+
 # Declaring as the main app to use FastAPI
 app = FastAPI()
 
@@ -698,6 +700,11 @@ def register_vaccine(vaccine_register_model: VaccineRegisterModel, response: Res
 
     return {'result': '成功註冊疫苗紀錄！'}
 
+# Create POST method API to query verified result from TWID Portal
+@app.post('/api/QueryVerifyResult')
+def query_verified_result():
+    return {}
+
 # Create POST method API to get verified result from TWID Portal
 @app.post('/api/VerifyResult')
 def verify_result(
@@ -713,6 +720,31 @@ def verify_result(
         ReturnCodeDesc: str = Form(...),
         IdentifyNo: str = Form(...),
     ):
+    update_do_verify_no(Token, ReturnCode, ResultCode)
+    member_no = query_member_no_by_token(Token)
+    if member_no is False:
+        return {
+            'Error': 'QueryVerifyResult is failed to find member no.',
+        }
+
+    portal_server = 'https://midonlinetest.twca.com.tw/IDPortal/QueryVerifyResult'
+    twca_config = get_twca_config()
+    plain_text = BusinessNo + ApiVersion + HashKeyNo + VerifyNo + member_no + Token + twca_config['hash_key']
+    identify_no = identify_generator(plain_text)
+    twca_client = TWCAClient(portal_server)
+    payload = {
+        'BusinessNo': BusinessNo,
+        'ApiVersion': ApiVersion,
+        'HashKeyNo': HashKeyNo,
+        'VerifyNo': VerifyNo,
+        'MemberNo': member_no,
+        'Token': Token,
+        'IdentifyNo': identify_no,
+    }
+    query_verified_response = twca_client.query_verified_result(payload)
+    output_params = loads(query_verified_response['OutputParams'])
+    update_query_verify_no(Token, query_verified_response['ReturnCode'], query_verified_response['ResultCode'], output_params['VerifyTime'])
+
     return {
         'BusinessNo': BusinessNo,
         'ApiVersion': ApiVersion,
@@ -728,6 +760,7 @@ def verify_result(
     }
 
 class LoginTWIDPortalModel(BaseModel):
+    url: str
     member_no: str
     action: str
     plain_text: str
@@ -741,8 +774,6 @@ class LoginTWIDPortalModel(BaseModel):
 # Create POST method API to login TWID Portal
 @app.post('/api/LoginTWIDPortal')
 def login_twid_portal(login_twid_portal_model: LoginTWIDPortalModel, response: Response):
-    portal_server = 'https://midonlinetest.twca.com.tw/IDPortal/Login'
-    twca_client = TWCAClient(portal_server)
     twca_config = get_twca_config()
     if 'error' in twca_config.keys():
         response.status_code = status.HTTP_400_BAD_REQUEST
@@ -750,6 +781,9 @@ def login_twid_portal(login_twid_portal_model: LoginTWIDPortalModel, response: R
         return twca_config
 
     post_data = login_twid_portal_model.dict()
+    portal_server = post_data['url']
+    portal_server += '/Login'
+    twca_client = TWCAClient(portal_server)
     input_params = {
         'MemberNo': post_data['member_no'],
         'Action': post_data['action'],
@@ -780,7 +814,7 @@ def login_twid_portal(login_twid_portal_model: LoginTWIDPortalModel, response: R
         'InputParams': dumps(input_params),
     }
 
-    token_response = twca_client.login_portal(payload)
+    token_response = twca_client.login_portal(post_data['url'], payload)
     if token_response['ReturnCode'] != '0':
         return token_response
 
@@ -788,7 +822,11 @@ def login_twid_portal(login_twid_portal_model: LoginTWIDPortalModel, response: R
     token = output_params['Token']
     plain_text = twca_config['business_no'] + api_version + twca_config['hash_key_no'] + verify_no + token + twca_config['hash_key']
     token_response['IdentifyNo'] = identify_generator(plain_text)
-    store_verify_no(verify_no, token_response['IdentifyNo'])
+    member_no = post_data['member_no']
+    login_result_code = token_response['ResultCode']
+    login_return_code = token_response['ReturnCode']
+    login_time = output_params['TimeStamp']
+    store_verify_no(verify_no, token_response['IdentifyNo'], token, member_no, login_result_code, login_return_code, login_time)
 
     return token_response
 
@@ -1057,18 +1095,75 @@ def get_twca_config():
 def get_verify_no():
     return str(uuid4()).replace('-', '')
 
-def store_verify_no(verify_no, identify_no):
+def update_do_verify_no(login_token, do_return_code, do_result_code):
     create_verify_no()
-    created_time = int(datetime.now().timestamp())
+    db_conn = sqlite3.connect(gettempdir() + '/healthy_passport.sqlite3')
+    db_conn.cursor()
+    db_conn.execute('''
+        UPDATE twid_verify_no
+        SET DoReturnCode = ?, DoResultCode = ?
+        WHERE LoginToken = ?
+    ''', [do_return_code, do_result_code, login_token])
+    db_conn.commit()
+    db_conn.close()
+
+    return True
+
+def update_query_verify_no(login_token, query_return_code, query_result_code, query_time):
+    create_verify_no()
+    db_conn = sqlite3.connect(gettempdir() + '/healthy_passport.sqlite3')
+    db_conn.cursor()
+    db_conn.execute('''
+        UPDATE twid_verify_no
+        SET QueryReturnCode = ?, QueryResultCode = ?, QueryTime= ?
+        WHERE LoginToken = ?
+    ''', [query_return_code, query_result_code, query_time, login_token])
+    db_conn.commit()
+    db_conn.close()
+
+    return True
+
+def query_member_no_by_token(token):
+    db_conn = sqlite3.connect(gettempdir() + '/healthy_passport.sqlite3')
+    db_conn.cursor()
+    fetched_obj = db_conn.execute('''
+        SELECT MemberNo FROM twid_verify_no
+        WHERE LoginToken = ?
+    ''', [token])
+    fetched_result = fetched_obj.fetchone()
+    db_conn.close()
+
+    if fetched_result is None:
+        return False
+
+    return fetched_result
+
+def store_verify_no(verify_no, identify_no, login_token, member_no, login_result_code, login_return_code, login_time):
+    create_verify_no()
+    created_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     db_conn = sqlite3.connect(gettempdir() + '/healthy_passport.sqlite3')
     db_conn.cursor()
     db_conn.execute('''
         INSERT INTO twid_verify_no(
-            IdentifyNo,
             VerifyNo,
-            CreatedTokenDateTime
-        ) VALUES (?, ?, ?)'
-    ''', [verify_no, identify_no, created_time])
+            MemberNo,
+            LoginToken,
+            IdentifyNoWithToken,
+            CreatedDateTime,
+            LoginResultCode,
+            LoginReturnCode,
+            LoginTime
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ''', [
+        verify_no,
+        member_no,
+        login_token,
+        identify_no,
+        created_time,
+        login_result_code,
+        login_return_code,
+        login_time
+    ])
     db_conn.commit()
     db_conn.close()
 
@@ -1080,13 +1175,24 @@ def create_verify_no():
     db_conn.execute('''
         CREATE TABLE IF NOT EXISTS "twid_verify_no"(
             [ListId] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
-            [IdentifyNo] NVARCHAR(150) NOT NULL,
             [VerifyNo] NVARCHAR(70) NOT NULL,
-            [CreatedTokenDateTime] INT NOT NULL
+            [MemberNo] NVARCHAR(70) NOT NULL,
+            [LoginToken] NVARCHAR(100) NOT NULL,
+            [IdentifyNoWithToken] NVARCHAR(150) NOT NULL,
+            [CreatedDateTime] NVARCHAR(50) NOT NULL,
+            [LoginResultCode] NVARCHAR(5) NOT NULL,
+            [LoginReturnCode] NVARCHAR(10) NOT NULL,
+            [LoginTime] NVARCHAR(70) NOT NULL,
+            [DoResultCode] NVARCHAR(5) NULL,
+            [DoReturnCode] NVARCHAR(10) NULL,
+            [QueryResultCode] NVARCHAR(5) NULL,
+            [QueryReturnCode] NVARCHAR(10) NULL,
+            [QueryTime] NVARCHAR(70) NULL
         )
     ''')
     db_conn.commit()
     db_conn.close()
+
     return True
 
 def identify_generator(plain_text):

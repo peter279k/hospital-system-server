@@ -4,6 +4,8 @@ import requests
 # Import loads funcion
 from json import loads
 
+from starlette.responses import Response
+
 class Client:
     def __init__(self, portal_server):
         self.portal_server = portal_server
@@ -12,10 +14,16 @@ class Client:
             'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
         }
 
-    def login_portal(self, payload):
-        url = 'https://midonlinetest.twca.com.tw/IDPortal/Login'
+    def login_portal(self, url, payload):
+        url += '/Login'
         response = requests.post(url, headers=self.headers, data=payload)
 
+        response_dict = loads(response.text)
+
+        return response_dict
+
+    def query_verified_result(self, payload):
+        response = requests.post(self.portal_server, headers=self.headers, data=payload)
         response_dict = loads(response.text)
 
         return response_dict
