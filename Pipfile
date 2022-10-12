@@ -7,8 +7,9 @@ name = "pypi"
 fastapi = "*"
 uvicorn = "*"
 requests = "*"
+typing-extensions = "*"
 python-multipart = "*"
-hospital-system-server = {editable = true, path = "."}
+hospital-system-server = {path = "."}
 qrcode = {extras = ["pil"], version = "*"}
 
 [dev-packages]
