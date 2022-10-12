@@ -5,7 +5,8 @@ name = "pypi"
 
 [packages]
 fastapi = "*"
-uvicorn = "*"
+uvicorn = "[standard]"
+gunicorn= "[standard]"
 requests = "*"
 typing-extensions = "*"
 python-multipart = "*"

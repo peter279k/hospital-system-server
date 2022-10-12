@@ -1,0 +1,14 @@
+[Unit]
+Description=HospitalSystemServer
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+User=peter
+Restart=always
+Type=simple
+WorkingDirectory=/home/peter/hospital-system-server
+ExecStart=/home/peter/.local/bin/pipenv run gunicorn -b 0.0.0.0:8000 -w 4 -k uvicorn.workers.UvicornWorker main:app --error-logfile /home/peter/hospital-system-server/error_log.txt
+
+[Install]
+WantedBy=multi-user.target
